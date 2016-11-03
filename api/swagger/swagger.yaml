@@ -1,0 +1,244 @@
+swagger: "2.0"
+info:
+  version: "0.0.1"
+  title: Digitales Museum Backend
+# during dev, should point to your local machine
+host: localhost:10010
+# basePath prefixes all resource paths
+basePath: /
+#
+schemes:
+  # tip: remove http to make production-grade
+  - http
+  - https
+# format of bodies a client can send (Content-Type)
+consumes:
+  - application/json
+# format of the responses to the client (Accepts)
+produces:
+  - application/json
+paths:
+  /hello:
+    # binds a127 app logic to a route
+    x-swagger-router-controller: hello_world
+    get:
+      description: Returns 'Hello' to the caller
+      # used as the method name of the controller
+      operationId: hello
+      parameters:
+        - name: name
+          in: query
+          description: The name of the person to whom to say hello
+          required: false
+          type: string
+      responses:
+        "200":
+          description: Success
+          schema:
+            # a pointer to a definition
+            $ref: "#/definitions/HelloWorldResponse"
+        # responses may fall through to errors
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /swagger:
+    x-swagger-pipe: swagger_raw
+
+  /person:
+    x-swagger-router-controller: person
+    get:
+      description: Returns all relevant Person information
+      operationId: personGetAll
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: "#/definitions/MultiplePersonResponse"
+
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
+  /person/new:
+    x-swagger-router-controller: person
+    put:
+      description: Add a new Person
+      operationId: personAddNew
+      parameters:
+        - name: person
+          in: body
+          description: Person to add
+          required: true
+          schema:
+            $ref: "#/definitions/PersonResponse"
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: "#/definitions/CreatedResponse"
+
+  /person/{id}:
+    x-swagger-router-controller: person
+    get:
+      description: Get Specific Person
+      operationId: personGetSpecific
+      parameters:
+        - name: id
+          in: path
+          description: ID of Person to fetch
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: "#/definitions/PersonResponse"
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    patch:
+      description: Update Specific Person
+      operationId: personUpdateSpecific
+      parameters:
+        - name: id
+          in: path
+          description: ID of Person to update
+          required: true
+          type: integer
+          format: int64
+        - name: person
+          in: body
+          description: Person Information
+          required: true
+          schema:
+            $ref: "#/definitions/PersonResponse"
+      responses:
+        "200":
+          description: Success
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    delete:
+      description: Delete Specific Person
+      operationId: personDeleteSpecific
+      parameters:
+        - name: id
+          in: path
+          description: ID of Person to delete
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: Success
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
+
+# complex objects have schema definitions
+definitions:
+  HelloWorldResponse:
+    required:
+      - message
+    properties:
+      message:
+        type: string
+  ErrorResponse:
+    required:
+      - message
+    properties:
+      message:
+        type: string
+  MultiplePersonResponse:
+    required:
+      - persons
+    properties:
+      persons:
+        type: array
+        items:
+          $ref: "#/definitions/PersonResponse"
+  PersonResponse:
+    required:
+      - firstname
+      - lastname
+      - portrait
+      - id
+    properties:
+      firstname:
+        type: string
+      lastname:
+        type: string
+      portrait:
+        $ref: "#/definitions/Image"
+      chips:
+        type: array
+        items:
+          $ref: "#/definitions/Chips"
+      dataTiles:
+        type: array
+        items:
+          $ref: "#/definitions/DataTile"
+      imageTiles:
+        type: array
+        items:
+          $ref: "#/definitions/Image"
+      id:
+        type: number
+  Image:
+    required:
+      - url
+    properties:
+      url:
+        type: string
+      width:
+        type: number
+      height:
+        type: number
+      source:
+        type: string
+      caption:
+        type: string
+  Chips:
+    required:
+      - letter
+      - text
+    properties:
+      letter:
+        type: string
+      text:
+        type: string
+  DataTile:
+    required:
+      - button_text
+      - short_text
+    properties:
+      button_text:
+        type: string
+      long_text:
+        type: string
+      short_text:
+        type: string
+  ImageTile:
+    required:
+      - image
+      - source
+    properties:
+      image:
+        $ref: "#/definitions/Image"
+      source:
+        type : string
+      caption:
+        type : string
+  CreatedResponse:
+    required:
+      - id
+    properties:
+      id:
+        type: number
