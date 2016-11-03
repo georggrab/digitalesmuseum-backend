@@ -15,6 +15,13 @@ SwaggerExpress.create(config, function(err, swaggerExpress) {
   swaggerExpress.register(app);
 
   var port = process.env.PORT || 10010;
+  app.use(function (error, req, res, next) {
+    if (error) {
+      res.status(500).json({message : error.status});
+    } else {
+      next();
+    }
+  });
   app.listen(port);
 
   if (swaggerExpress.runner.swagger.paths['/hello']) {

@@ -140,6 +140,10 @@ function personGetSpecific(req, res) {
 
 // PUT /person/new
 function insertPortrait(callback) {
+    if (this.body.hasOwnProperty("portrait") && this.body.portrait.length < 1){
+      return callback("portrait required!");
+    }
+
     var p = this.body.portrait[0];
     connection.query('INSERT INTO image_tiles SET ?', {
         caption: p.caption,
@@ -153,6 +157,9 @@ function insertPortrait(callback) {
 }
 
 function insertImages(callback) {
+    if (this.body.hasOwnProperty("imageTiles") && this.body.imageTiles.length < 1){
+      return callback("image tiles required!");
+    }
     var bulkArray = [];
     for (var person of this.body.imageTiles) {
         bulkArray.push([person.url, person.caption,
@@ -166,6 +173,11 @@ function insertImages(callback) {
 }
 
 function insertData(callback) {
+    if (this.body.hasOwnProperty("dataTiles") && this.body.dataTiles.length < 1){
+      // DataTiles are not required
+      return callback(null, [null, null]);
+    }
+
     var bulkArray = [];
     for (var tile of this.body.dataTiles) {
         bulkArray.push([tile.button_text, tile.long_text, tile.short_text]);
@@ -177,6 +189,10 @@ function insertData(callback) {
 }
 
 function insertTags(callback) {
+    if (this.body.hasOwnProperty("chips") && this.body.chips.length < 1){
+      // Tags are not required
+      return callback(null, [null, null]);
+    }
     var bulkArray = [];
     for (var chip of this.body.chips) {
         bulkArray.push([chip.letter, chip.text]);
@@ -191,8 +207,8 @@ function insertPerson(portraitID, next) {
       (firstname, lastname, caption, portrait_id) VALUES (?)', [
         [this.body.firstname, this.body.lastname, this.body.caption, portraitID]
     ], function(err, results) {
-        if (err) console.error(err);
-        next(err, [results.insertId, results.affectedRows]);
+        if (err) return next(err);
+        next(null, [results.insertId, results.affectedRows]);
 
     });
 }
@@ -208,10 +224,14 @@ function personAdd(req, res) {
         tasks[task] = tasks[task].bind(req);
     }
     async.parallel(tasks, function(err, results) {
-        async.waterfall([
+        if (err) {
+          return res.status(500).json({message : err});
+        } async.waterfall([
             insertPerson.bind(req, results[0])
         ], function(err, person) {
-            if (err) throw err;
+            if (err) {
+              res.status(500).json({message : err});
+            }
             // Link person table to satellite entities
             var connSQLs = [];
             for (var i = results[1][0]; i < results[1][0] + results[1][1]; i++) {
@@ -228,7 +248,7 @@ function personAdd(req, res) {
                     if (err) console.error(err);
                 });
             }
-            res.json(person);
+            res.json({id: person[0]});
         });
     });
 }
