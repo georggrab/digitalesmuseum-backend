@@ -8,7 +8,7 @@ module.exports = {
     personGetSpecific: personGetSpecific,
     personAddNew: personAdd,
     personUpdateSpecific: hello,
-    personDeleteSpecific: hello
+    personDeleteSpecific: personDeleteSpecific
 };
 
 
@@ -21,6 +21,7 @@ var connection = mysql.createConnection({
 
 function groupResultByID(rows, push) {
     var result = {};
+    if (rows.length < 1) return result;
 
     var atID = rows[0].id;
     result[atID] = [];
@@ -110,6 +111,16 @@ function personGetAll(req, res) {
         });
     });
 
+}
+
+// DELETE /person/{id}
+function personDeleteSpecific(req, res) {
+  var id = req.swagger.params.id.value;
+  connection.query('DELETE FROM person WHERE id = ?', [id], function (err, results){
+    if (err) { res.status(500).end({message: err}); } else {
+      res.end({status: "OK"});
+    }
+  });
 }
 
 // GET /person/{id}
