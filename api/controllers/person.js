@@ -2,6 +2,7 @@
 var util = require('util');
 var mysql = require('mysql');
 var async = require('async');
+var fs = require('fs');
 
 module.exports = {
     personGetAll: personGetAll,
@@ -11,13 +12,8 @@ module.exports = {
     personDeleteSpecific: personDeleteSpecific
 };
 
-
-var connection = mysql.createConnection({
-    host: "141.31.8.88",
-    user: "it",
-    password: "xakixi94",
-    database: "museum"
-});
+var config = JSON.parse(fs.readFileSync('./config/db.json', 'utf-8'));
+var connection = mysql.createConnection(config);
 
 function groupResultByID(rows, push) {
     var result = {};
