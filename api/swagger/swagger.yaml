@@ -112,13 +112,15 @@ paths:
           format: int64
         - name: person
           in: body
-          description: Person Information
+          description: Person Information, or parts thereof
           required: true
           schema:
-            $ref: "#/definitions/PersonResponse"
+            $ref: "#/definitions/PersonPatch"
       responses:
         "200":
           description: Success
+          schema:
+            type: string
         default:
           description: Error
           schema:
@@ -164,6 +166,28 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/PersonResponse"
+  PersonPatch:
+    properties:
+      firstname:
+        type: string
+      lastname:
+        type: string
+      portrait:
+        $ref: "#/definitions/Image"
+      chips:
+        type: array
+        items:
+          $ref: "#/definitions/Chips"
+      dataTiles:
+        type: array
+        items:
+          $ref: "#/definitions/DataTile"
+      imageTiles:
+        type: array
+        items:
+          $ref: "#/definitions/Image"
+      id:
+        type: number
   PersonResponse:
     required:
       - firstname

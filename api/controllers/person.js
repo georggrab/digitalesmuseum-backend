@@ -8,7 +8,7 @@ module.exports = {
     personGetAll: personGetAll,
     personGetSpecific: personGetSpecific,
     personAddNew: personAdd,
-    personUpdateSpecific: hello,
+    personUpdateSpecific: personUpdateSpecific,
     personDeleteSpecific: personDeleteSpecific
 };
 
@@ -107,6 +107,44 @@ function personGetAll(req, res) {
             persons: result
         });
     });
+
+}
+
+// PATCH /person/{id}
+function personUpdateSpecific(req, res){
+    var id = req.swagger.params.id.value;
+    var deducedQueries = [], deducedRequests = [];
+    for (var entry in req.body){
+      switch(entry) {
+        case "firstname":
+        case "lastname":
+        case "caption":
+          deducedQueries.push(
+            mysql.format("UPDATE person SET ??=? WHERE id = ?", [entry, req.body[entry], id]));
+          break;
+        case "imageTiles":
+          insertImages.bind(req)(function (err, result){
+            if (err) throw err;
+            for (var i = result[0]; i < result[0] + result[1]; i++){
+              deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
+                (image_id, person_id) VALUES (?,?)", [i, id]));
+            }
+          });
+      }
+    }
+    for (var query of deducedQueries){
+      console.log(query);
+      deducedRequests.push(function(callback){
+        connection.query(query, callback);
+      });
+    }
+    async.parallel(deducedRequests, function (err, results){
+      if (err) {
+        res.status(500).json({message : err});
+      } else {
+        res.json("OK");
+      }
+    })
 
 }
 
