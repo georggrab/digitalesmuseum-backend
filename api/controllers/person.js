@@ -93,6 +93,7 @@ function selectAllQuery(callback) {
 
         }
     ], function(err, result) {
+        if (err) throw err;
         callback(result);
     });
 }
@@ -111,12 +112,18 @@ function personGetAll(req, res) {
 
 // DELETE /person/{id}
 function personDeleteSpecific(req, res) {
-  var id = req.swagger.params.id.value;
-  connection.query('DELETE FROM person WHERE id = ?', [id], function (err, results){
-    if (err) { res.status(500).end({message: err}); } else {
-      res.end({status: "OK"});
-    }
-  });
+    var id = req.swagger.params.id.value;
+    connection.query('DELETE FROM person WHERE id = ?', [id], function(err, results) {
+        if (err) {
+            res.status(500).end({
+                message: err
+            });
+        } else {
+            res.end({
+                status: "OK"
+            });
+        }
+    });
 }
 
 // GET /person/{id}
@@ -132,111 +139,99 @@ function personGetSpecific(req, res) {
 }
 
 // PUT /person/new
-function personAdd(req, res) {
-    async.waterfall([
-        function(next) {
-            var p = req.body.portrait[0];
-            connection.query('INSERT INTO image_tiles SET ?', {
-                caption: p.caption,
-                url: p.url,
-                source: p.source,
-                height: p.height,
-                width: p.width
-            }, function(err, results) {
-                if (err) {
-                    res.status(500).send({
-                        message: err
-                    });
-                    throw err;
-                };
-                next(null, req.body, results.insertId);
-            });
-        },
-        function(body, portraitID, next) {
-            var bulkArray = [];
-            for (var person of req.body.imageTiles) {
-                bulkArray.push([person.url, person.caption,
-                    person.source, person.width, person.height
-                ]);
-            }
-            console.log(bulkArray);
-            connection.query('INSERT INTO image_tiles (url, caption, source, width, height) \
-              VALUES ?', [bulkArray], function(err, results) {
-                if (err) {
-                    res.status(500).send({
-                        message: err
-                    });
-                    throw err;
-                };
-                next(null, body, portraitID, [results.insertId, results.affectedRows]);
-            });
-        },
-        function(body, portraitID, images, next) {
-            var bulkArray = [];
-            for (var tile of req.body.dataTiles) {
-                bulkArray.push([tile.button_text, tile.long_text, tile.short_text]);
-            }
-            connection.query('INSERT INTO text_tiles (button_text, long_text, short_text) \
-              VALUES ?', [bulkArray], function(err, results) {
-                if (err) {
-                    res.status(500).send({
-                        message: err
-                    });
-                    throw err;
-                };
-                console.log(results);
-                next(null, body, portraitID, images, [results.insertId, results.affectedRows]);
-            });
-        },
-        function(body, portraitID, images, data, next) {
-            var bulkArray = [];
-            for (var chip of req.body.chips) {
-                bulkArray.push([chip.letter, chip.text]);
-            }
-            connection.query('REPLACE INTO tags (letter, text) VALUES ?', [bulkArray], function(err, results) {
-                if (err) {
-                    console.log("Ignoring tag insertion Error (probably duplicate)");
-                    next(null, body, portraitID, images, data, null);
-                } else {
-                    next(null, body, portraitID, images, data, [results.insertId, results.affectedRows]);
-                }
-
-            });
-        },
-        function(body, portraitID, images, data, tags, next) {
-            var query = connection.query('INSERT INTO person (firstname, lastname, caption, portrait_id) VALUES (?)',
-            [[ body.firstname, body.lastname, body.caption, portraitID  ]], function(err, results) {
-                if (err) {
-                    console.error(err);
-                } else {
-                    next(null, body, portraitID, images, data, tags, [results.insertId, results.affectedRows]);
-                }
-            });
-        }
-    ], function(error, body, portraitID, images, data, tags, person) {
-        var connSQLs = [];
-
-        for (var i = images[0]; i < images[0] + images[1]; i++){
-          connSQLs.push("INSERT INTO person_image_tile (image_id, person_id) VALUES (" + i + "," + person[0] + ")");
-        }
-        for (var i = data[0]; i < data[0] + data[1]; i++){
-          connSQLs.push("INSERT INTO person_text_tile (text_tile_id, person_id) VALUES (" + i + "," + person[0] + ")");
-        }
-        for (var tag of body.chips){
-          connSQLs.push("INSERT INTO person_tags (tag_name, person_id) VALUES (\"" + tag.text + "\"," + person[0] + ")");
-        }
-        console.log(connSQLs);
-          for ( var query of connSQLs ) {
-            connection.query(query, function(err,results){
-              if (err) console.error(err);
-            });
-          }
-
-        res.json(person);
+function insertPortrait(callback) {
+    var p = this.body.portrait[0];
+    connection.query('INSERT INTO image_tiles SET ?', {
+        caption: p.caption,
+        url: p.url,
+        source: p.source,
+        height: p.height,
+        width: p.width
+    }, function(err, results) {
+        callback(err, results.insertId);
     });
 }
 
+function insertImages(callback) {
+    var bulkArray = [];
+    for (var person of this.body.imageTiles) {
+        bulkArray.push([person.url, person.caption,
+            person.source, person.width, person.height
+        ]);
+    }
+    connection.query('INSERT INTO image_tiles (url, caption, source, width, height) \
+              VALUES ?', [bulkArray], function(err, results) {
+        callback(err, [results.insertId, results.affectedRows]);
+    });
+}
 
+function insertData(callback) {
+    var bulkArray = [];
+    for (var tile of this.body.dataTiles) {
+        bulkArray.push([tile.button_text, tile.long_text, tile.short_text]);
+    }
+    connection.query('INSERT INTO text_tiles (button_text, long_text, short_text) \
+              VALUES ?', [bulkArray], function(err, results) {
+        callback(err, [results.insertId, results.affectedRows]);
+    });
+}
+
+function insertTags(callback) {
+    var bulkArray = [];
+    for (var chip of this.body.chips) {
+        bulkArray.push([chip.letter, chip.text]);
+    }
+    connection.query('REPLACE INTO tags (letter, text) VALUES ?', [bulkArray], function(err, results) {
+      callback(err, [results.insertId, results.affectedRows]);
+    });
+}
+
+function insertPerson(portraitID, next) {
+    var query = connection.query('INSERT INTO person \
+      (firstname, lastname, caption, portrait_id) VALUES (?)', [
+        [this.body.firstname, this.body.lastname, this.body.caption, portraitID]
+    ], function(err, results) {
+        if (err) console.error(err);
+        next(err, [results.insertId, results.affectedRows]);
+
+    });
+}
+
+function personAdd(req, res) {
+    var tasks = [
+        insertPortrait,
+        insertImages,
+        insertData,
+        insertTags,
+    ];
+    for (var task in tasks) {
+        tasks[task] = tasks[task].bind(req);
+    }
+    async.parallel(tasks, function(err, results) {
+        async.waterfall([
+            insertPerson.bind(req, results[0])
+        ], function(err, person) {
+            if (err) throw err;
+            // Link person table to satellite entities
+            var connSQLs = [];
+            for (var i = results[1][0]; i < results[1][0] + results[1][1]; i++) {
+                connSQLs.push("INSERT INTO person_image_tile\
+              (image_id, person_id) VALUES (" + i + "," + person[0] + ")");
+            } for (var i = results[2][0]; i < results[2][0] + results[2][1]; i++) {
+                connSQLs.push("INSERT INTO person_text_tile \
+              (text_tile_id, person_id) VALUES (" + i + "," + person[0] + ")");
+            } for (var tag of req.body.chips) {
+                connSQLs.push("INSERT INTO person_tags\
+              (tag_name, person_id) VALUES (\"" + tag.text + "\"," + person[0] + ")");
+            } for (var query of connSQLs) {
+                connection.query(query, function(err, results) {
+                    if (err) console.error(err);
+                });
+            }
+            res.json(person);
+        });
+    });
+}
 /*
   Functions in a127 controllers used for operations should take two parameters:
 
