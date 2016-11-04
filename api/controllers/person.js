@@ -127,13 +127,13 @@ function personUpdateSpecific(req, res) {
             case "imageTiles":
                 tasks.push(function(callback) {
                     insertImages.bind(req)(function(err, result) {
-                        if (err) throw err;
+                        if (err) return callback(err);
                         deducedQueries.push(mysql.format("DELETE FROM person_image_tile\
                 WHERE person_id = ?", [id]));
                         for (var i = result[0]; i < result[0] + result[1]; i++) {
-
                             deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
                 (image_id, person_id) VALUES (?,?)", [i, id]));
+                            callback(err);
                         }
                     });
                 });
@@ -141,6 +141,7 @@ function personUpdateSpecific(req, res) {
             case "dataTiles":
                 tasks.push(function(callback) {
                     insertData.bind(req)(function(err, result) {
+                        if (err) return callback(err);
                         deducedQueries.push(mysql.format("DELETE FROM person_text_tile\
                 WHERE person_id = ?", [id]));
                         for (var i = result[0]; i < result[0] + result[1]; i++) {
@@ -179,10 +180,10 @@ function personUpdateSpecific(req, res) {
     async.parallel(tasks, function(_derr, _dres) {
         if (_derr) return res.status(500).json({ message: _derr });
         for (var query in deducedQueries) {
-            (function(query){
-              deducedRequests.push(function(callback) {
-                  connection.query(query, callback);
-              });
+            (function(query) {
+                deducedRequests.push(function(callback) {
+                    connection.query(query, callback);
+                });
             })(deducedQueries[query]);
         }
         // In series because delete from --> insert.... TODO maybe optimize
@@ -256,6 +257,7 @@ function insertImages(callback) {
     }
     connection.query('INSERT INTO image_tiles (url, caption, source, width, height) \
               VALUES ?', [bulkArray], function(err, results) {
+        if (err) return callback(err);
         callback(err, [results.insertId, results.affectedRows]);
     });
 }
@@ -272,6 +274,7 @@ function insertData(callback) {
     }
     connection.query('INSERT INTO text_tiles (button_text, long_text, short_text) \
               VALUES ?', [bulkArray], function(err, results) {
+        if (err) return callback(err);
         callback(err, [results.insertId, results.affectedRows]);
     });
 }
@@ -286,7 +289,8 @@ function insertTags(callback) {
         bulkArray.push([chip.letter, chip.text]);
     }
     connection.query('REPLACE INTO tags (letter, text) VALUES ?', [bulkArray], function(err, results) {
-        callback(err, [results.insertId, results.affectedRows]);
+      if (err) return callback(err);
+      callback(err, [results.insertId, results.affectedRows]);
     });
 }
 
