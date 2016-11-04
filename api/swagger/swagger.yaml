@@ -206,7 +206,6 @@ definitions:
       - firstname
       - lastname
       - portrait
-      - id
       - caption
     properties:
       firstname:
