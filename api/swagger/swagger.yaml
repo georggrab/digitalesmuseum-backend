@@ -78,7 +78,20 @@ paths:
           description: Success
           schema:
             $ref: "#/definitions/CreatedResponse"
-
+  /person/purgeAll:
+    x-swagger-router-controller: person
+    get:
+      description: Purge All person
+      operationId: purge
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: string
+        default:
+          description: Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
   /person/{id}:
     x-swagger-router-controller: person
     get:

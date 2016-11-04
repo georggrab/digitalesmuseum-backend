@@ -9,7 +9,8 @@ module.exports = {
     personGetSpecific: personGetSpecific,
     personAddNew: personAdd,
     personUpdateSpecific: personUpdateSpecific,
-    personDeleteSpecific: personDeleteSpecific
+    personDeleteSpecific: personDeleteSpecific,
+    purge: purge
 };
 
 var config = JSON.parse(fs.readFileSync('./config/db.json', 'utf-8'));
@@ -289,8 +290,8 @@ function insertTags(callback) {
         bulkArray.push([chip.letter, chip.text]);
     }
     connection.query('REPLACE INTO tags (letter, text) VALUES ?', [bulkArray], function(err, results) {
-      if (err) return callback(err);
-      callback(err, [results.insertId, results.affectedRows]);
+        if (err) return callback(err);
+        callback(err, [results.insertId, results.affectedRows]);
     });
 }
 
@@ -346,6 +347,24 @@ function personAdd(req, res) {
             }
             res.json({ id: person[0] });
         });
+    });
+}
+// GET /person/purgeAll
+function purge(req, res) {
+    var requests = [
+            "DELETE FROM person", "DELETE from tags", "DELETE from image_tiles", "DELETE from data_tiles"
+        ],
+        tasks = [];
+    for (var q of requests) {
+        (function(query) {
+          tasks.push(function(callback){
+            connection.query(query, callback);
+          });
+        })(q);
+    }
+    async.parallel(tasks, function(err, response){
+      if (err) { res.status(500).json({message : err}) }
+      else { res.json("OK") }
     });
 }
 /*
