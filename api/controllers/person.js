@@ -209,7 +209,7 @@ function personDeleteSpecific(req, res) {
                 message: err
             });
         } else {
-            res.end({
+            res.json({
                 status: "OK"
             });
         }

@@ -151,6 +151,8 @@ paths:
       responses:
         "200":
           description: Success
+          schema:
+            type: string
         default:
           description: Error
           schema:
