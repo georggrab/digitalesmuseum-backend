@@ -207,10 +207,13 @@ definitions:
       - lastname
       - portrait
       - id
+      - caption
     properties:
       firstname:
         type: string
       lastname:
+        type: string
+      caption:
         type: string
       portrait:
         $ref: "#/definitions/Image"
