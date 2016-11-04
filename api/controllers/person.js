@@ -128,7 +128,10 @@ function personUpdateSpecific(req, res) {
                 tasks.push(function(callback) {
                     insertImages.bind(req)(function(err, result) {
                         if (err) throw err;
+                        deducedQueries.push(mysql.format("DELETE FROM person_image_tile\
+                WHERE person_id = ?", [id]));
                         for (var i = result[0]; i < result[0] + result[1]; i++) {
+
                             deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
                 (image_id, person_id) VALUES (?,?)", [i, id]));
                         }
@@ -138,30 +141,31 @@ function personUpdateSpecific(req, res) {
             case "dataTiles":
                 tasks.push(function(callback) {
                     insertData.bind(req)(function(err, result) {
-                        if (err) throw err;
+                        deducedQueries.push(mysql.format("DELETE FROM person_text_tile\
+                WHERE person_id = ?", [id]));
                         for (var i = result[0]; i < result[0] + result[1]; i++) {
+
                             deducedQueries.push(mysql.format("INSERT INTO person_text_tile\
                 (text_tile_id, person_id) VALUES (?,?)", [i, id]));
                         }
+                        callback(err);
                     });
                 });
                 break;
             case "portrait":
                 tasks.push(function(callback) {
                     insertPortrait.bind(req)(function(err, result) {
-                        if (err) throw err;
-                        for (var i = result[0]; i < result[0] + result[1]; i++) {
-                            deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
-                  (text_tile_id, person_id) VALUES (?,?)", [i, id]));
-
-                        }
-
+                        deducedQueries.push(mysql.format("UPDATE \
+                  person SET portrait_id = ? WHERE id = ?", [result, id]));
+                        callback(err);
                     });
                 });
                 break;
             case "chips":
                 tasks.push(function(callback) {
                     insertTags.bind(req)(function(err, result) {
+                        deducedQueries.push(mysql.format("DELETE FROM person_tags\
+                WHERE person_id = ?", [id]));
                         for (var chip of req.body.chips) {
                             deducedQueries.push(mysql.format("INSERT INTO person_tags\
                 (tag_name, person_id) VALUES (?,?)", [chip.text, id]));
@@ -173,13 +177,16 @@ function personUpdateSpecific(req, res) {
         }
     }
     async.parallel(tasks, function(_derr, _dres) {
-        for (var query of deducedQueries) {
-            console.log(query);
-            deducedRequests.push(function(callback) {
-                connection.query(query, callback);
-            });
+        if (_derr) return res.status(500).json({ message: _derr });
+        for (var query in deducedQueries) {
+            (function(query){
+              deducedRequests.push(function(callback) {
+                  connection.query(query, callback);
+              });
+            })(deducedQueries[query]);
         }
-        async.parallel(deducedRequests, function(err, results) {
+        // In series because delete from --> insert.... TODO maybe optimize
+        async.series(deducedRequests, function(err, results) {
             if (err) {
                 res.status(500).json({ message: err });
             } else {
