@@ -111,40 +111,83 @@ function personGetAll(req, res) {
 }
 
 // PATCH /person/{id}
-function personUpdateSpecific(req, res){
+function personUpdateSpecific(req, res) {
     var id = req.swagger.params.id.value;
-    var deducedQueries = [], deducedRequests = [];
-    for (var entry in req.body){
-      switch(entry) {
-        case "firstname":
-        case "lastname":
-        case "caption":
-          deducedQueries.push(
-            mysql.format("UPDATE person SET ??=? WHERE id = ?", [entry, req.body[entry], id]));
-          break;
-        case "imageTiles":
-          insertImages.bind(req)(function (err, result){
-            if (err) throw err;
-            for (var i = result[0]; i < result[0] + result[1]; i++){
-              deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
+    var deducedQueries = [],
+        deducedRequests = [],
+        tasks = [];
+    for (var entry in req.body) {
+        switch (entry) {
+            case "firstname":
+            case "lastname":
+            case "caption":
+                deducedQueries.push(
+                    mysql.format("UPDATE person SET ??=? WHERE id = ?", [entry, req.body[entry], id]));
+                break;
+            case "imageTiles":
+                tasks.push(function(callback) {
+                    insertImages.bind(req)(function(err, result) {
+                        if (err) throw err;
+                        for (var i = result[0]; i < result[0] + result[1]; i++) {
+                            deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
                 (image_id, person_id) VALUES (?,?)", [i, id]));
+                        }
+                    });
+                });
+                break;
+            case "dataTiles":
+                tasks.push(function(callback) {
+                    insertData.bind(req)(function(err, result) {
+                        if (err) throw err;
+                        for (var i = result[0]; i < result[0] + result[1]; i++) {
+                            deducedQueries.push(mysql.format("INSERT INTO person_text_tile\
+                (text_tile_id, person_id) VALUES (?,?)", [i, id]));
+                        }
+                    });
+                });
+                break;
+            case "portrait":
+                tasks.push(function(callback) {
+                    insertPortrait.bind(req)(function(err, result) {
+                        if (err) throw err;
+                        for (var i = result[0]; i < result[0] + result[1]; i++) {
+                            deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
+                  (text_tile_id, person_id) VALUES (?,?)", [i, id]));
+
+                        }
+
+                    });
+                });
+                break;
+            case "chips":
+                tasks.push(function(callback) {
+                    insertTags.bind(req)(function(err, result) {
+                        for (var chip of req.body.chips) {
+                            deducedQueries.push(mysql.format("INSERT INTO person_tags\
+                (tag_name, person_id) VALUES (?,?)", [chip.text, id]));
+                        }
+                        callback(err);
+                    });
+                });
+                break;
+        }
+    }
+    async.parallel(tasks, function(_derr, _dres) {
+        for (var query of deducedQueries) {
+            console.log(query);
+            deducedRequests.push(function(callback) {
+                connection.query(query, callback);
+            });
+        }
+        async.parallel(deducedRequests, function(err, results) {
+            if (err) {
+                res.status(500).json({ message: err });
+            } else {
+                res.json("OK");
             }
-          });
-      }
-    }
-    for (var query of deducedQueries){
-      console.log(query);
-      deducedRequests.push(function(callback){
-        connection.query(query, callback);
-      });
-    }
-    async.parallel(deducedRequests, function (err, results){
-      if (err) {
-        res.status(500).json({message : err});
-      } else {
-        res.json("OK");
-      }
+        })
     })
+
 
 }
 
@@ -178,8 +221,8 @@ function personGetSpecific(req, res) {
 
 // PUT /person/new
 function insertPortrait(callback) {
-    if (this.body.hasOwnProperty("portrait") && this.body.portrait.length < 1){
-      return callback("portrait required!");
+    if (this.body.hasOwnProperty("portrait") && this.body.portrait.length < 1) {
+        return callback("portrait required!");
     }
 
     var p = this.body.portrait[0];
@@ -195,8 +238,8 @@ function insertPortrait(callback) {
 }
 
 function insertImages(callback) {
-    if (this.body.hasOwnProperty("imageTiles") && this.body.imageTiles.length < 1){
-      return callback("image tiles required!");
+    if (this.body.hasOwnProperty("imageTiles") && this.body.imageTiles.length < 1) {
+        return callback("image tiles required!");
     }
     var bulkArray = [];
     for (var person of this.body.imageTiles) {
@@ -211,9 +254,9 @@ function insertImages(callback) {
 }
 
 function insertData(callback) {
-    if (this.body.hasOwnProperty("dataTiles") && this.body.dataTiles.length < 1){
-      // DataTiles are not required
-      return callback(null, [null, null]);
+    if (this.body.hasOwnProperty("dataTiles") && this.body.dataTiles.length < 1) {
+        // DataTiles are not required
+        return callback(null, [null, null]);
     }
 
     var bulkArray = [];
@@ -227,16 +270,16 @@ function insertData(callback) {
 }
 
 function insertTags(callback) {
-    if (this.body.hasOwnProperty("chips") && this.body.chips.length < 1){
-      // Tags are not required
-      return callback(null, [null, null]);
+    if (this.body.hasOwnProperty("chips") && this.body.chips.length < 1) {
+        // Tags are not required
+        return callback(null, [null, null]);
     }
     var bulkArray = [];
     for (var chip of this.body.chips) {
         bulkArray.push([chip.letter, chip.text]);
     }
     connection.query('REPLACE INTO tags (letter, text) VALUES ?', [bulkArray], function(err, results) {
-      callback(err, [results.insertId, results.affectedRows]);
+        callback(err, [results.insertId, results.affectedRows]);
     });
 }
 
@@ -263,30 +306,34 @@ function personAdd(req, res) {
     }
     async.parallel(tasks, function(err, results) {
         if (err) {
-          return res.status(500).json({message : err});
-        } async.waterfall([
+            return res.status(500).json({ message: err });
+        }
+        async.waterfall([
             insertPerson.bind(req, results[0])
         ], function(err, person) {
             if (err) {
-              res.status(500).json({message : err});
+                res.status(500).json({ message: err });
             }
             // Link person table to satellite entities
             var connSQLs = [];
             for (var i = results[1][0]; i < results[1][0] + results[1][1]; i++) {
                 connSQLs.push("INSERT INTO person_image_tile\
               (image_id, person_id) VALUES (" + i + "," + person[0] + ")");
-            } for (var i = results[2][0]; i < results[2][0] + results[2][1]; i++) {
+            }
+            for (var i = results[2][0]; i < results[2][0] + results[2][1]; i++) {
                 connSQLs.push("INSERT INTO person_text_tile \
               (text_tile_id, person_id) VALUES (" + i + "," + person[0] + ")");
-            } for (var tag of req.body.chips) {
+            }
+            for (var tag of req.body.chips) {
                 connSQLs.push("INSERT INTO person_tags\
               (tag_name, person_id) VALUES (\"" + tag.text + "\"," + person[0] + ")");
-            } for (var query of connSQLs) {
+            }
+            for (var query of connSQLs) {
                 connection.query(query, function(err, results) {
                     if (err) console.error(err);
                 });
             }
-            res.json({id: person[0]});
+            res.json({ id: person[0] });
         });
     });
 }
