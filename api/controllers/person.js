@@ -7,14 +7,32 @@ var fs = require('fs');
 module.exports = {
     personGetAll: personGetAll,
     personGetSpecific: personGetSpecific,
-    personAddNew: personAdd,
-    personUpdateSpecific: personUpdateSpecific,
-    personDeleteSpecific: personDeleteSpecific,
+    personAddNew: requiresAuth(personAdd),
+    personUpdateSpecific: requiresAuth(personUpdateSpecific),
+    personDeleteSpecific: requiresAuth(personDeleteSpecific),
     purge: purge
 };
 
 var config = JSON.parse(fs.readFileSync('./config/db.json', 'utf-8'));
 var connection = mysql.createConnection(config);
+
+function requiresAuth(wrap){
+  return function(req, res){
+    let u = req.get("X-DM-User"), p = req.get("X-DM-Apikey");
+    if (u && p){
+      connection.query("SELECT * FROM user WHERE username = ? AND apikey = ?",
+      [u, p], function(err, result){
+        if (err || result.length === 0){
+          return res.status(401).json({message: "Auth is Wrong!!!!!"});
+        } else {
+          return wrap(req, res);
+        }
+      });
+    } else {
+      return res.status(400).json({message: "This route requires auth!"});
+    }
+  }
+}
 
 function groupResultByID(rows, push) {
     var result = {};
