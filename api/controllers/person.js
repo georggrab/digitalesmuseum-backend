@@ -134,8 +134,8 @@ function personUpdateSpecific(req, res) {
                         for (var i = result[0]; i < result[0] + result[1]; i++) {
                             deducedQueries.push(mysql.format("INSERT INTO person_image_tile\
                 (image_id, person_id) VALUES (?,?)", [i, id]));
-                            callback(err);
                         }
+                        callback(err);
                     });
                 });
                 break;
